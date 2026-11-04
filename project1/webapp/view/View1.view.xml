@@ -1,6 +1,68 @@
-<mvc:View controllerName="com.sap.project1.controller.View1"
+<mvc:View
+    controllerName="com.sap.project1.controller.View1"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
-    <Page id="page" title="{i18n>title}">
+    xmlns="sap.m"
+    xmlns:ui="sap.ui.table"
+>
+    <Page
+        id="page"
+        title="Gestione Dati DB"
+    >
+        <content>
+            <!-- Tabella Responsiva (ideale per SAP Fiori) -->
+            <Table
+                id="genericTable"
+                items="{path: 'odataSydea>/MaterialSet'}"
+                growing="true"
+                growingThreshold="20"
+                class="sapUiResponsiveMargin"
+            >
+                <headerToolbar>
+                    <OverflowToolbar>
+                        <Title
+                            text="Elenco Elementi"
+                            level="H2"
+                        />
+                        <ToolbarSpacer />
+                        <Button
+                            icon="sap-icon://refresh"
+                            press="onRefresh"
+                        />
+                    </OverflowToolbar>
+                </headerToolbar>
+
+                <columns>
+                    <Column>
+                        <Text text="Codice Materiale" />
+                    </Column>
+                    <Column>
+                        <Text text="Data Creazione" />
+                    </Column>
+                    <Column>
+                        <Text text="Creato Da" />
+                    </Column>
+                    <Column>
+                        <Text text="Tipo Materiale" />
+                    </Column>
+                </columns>
+
+                <items>
+                    <ColumnListItem
+                        type="Navigation"
+                        press="onRowPress"
+                    >
+                        <cells>
+                            <ObjectIdentifier title="{odataSydea>Matnr}" />
+                            <Text text="{odataSydea>Ersda}" />
+                            <Text text="{odataSydea>Ernam}" />
+                            <ObjectStatus
+                                text="{odataSydea>Mtart}"
+                                state="None"
+                            />
+                        </cells>
+                    </ColumnListItem>
+                </items>
+            </Table>
+        </content>
     </Page>
 </mvc:View>
