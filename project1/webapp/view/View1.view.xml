@@ -20,10 +20,17 @@
                 <headerToolbar>
                     <OverflowToolbar>
                         <Title
-                            text="Elenco Elementi"
+                            text="Elenco Materiali"
                             level="H2"
                         />
                         <ToolbarSpacer />
+                        <!-- Nuovo pulsante per aprire la creazione -->
+                        <Button
+                            icon="sap-icon://add"
+                            text="Nuovo Materiale"
+                            type="Emphasized"
+                            press="onOpenCreateDialog"
+                        />
                         <Button
                             icon="sap-icon://refresh"
                             press="onRefresh"
