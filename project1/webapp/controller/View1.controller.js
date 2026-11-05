@@ -7,9 +7,10 @@ sap.ui.define([
     "sap/m/Input",
     "sap/m/Label",
     "sap/m/DatePicker",
+    "sap/m/Text",
     "sap/ui/layout/form/SimpleForm",
     "sap/ui/core/Element"
-], function (Controller, MessageBox, MessageToast, Dialog, Button, Input, Label, DatePicker, SimpleForm, Element) {
+], function (Controller, MessageBox, MessageToast, Dialog, Button, Input, Label, DatePicker, Text, SimpleForm, Element) {
     "use strict";
 
     return Controller.extend("my.namespace.myapp.controller.Main", {
@@ -27,6 +28,133 @@ sap.ui.define([
             if (oBinding) {
                 oBinding.refresh(true);
             }
+        },
+        
+        /**
+         * Gestisce il click su una riga e apre il Dialog di Acquisto
+         */
+        onRowPress: function (oEvent) {
+            var oSelectedItem = oEvent.getSource();
+            var oModel = this.getView().getModel("odataSydea");
+            var oContext = oSelectedItem.getBindingContext("odataSydea");
+            
+            if (!oContext) {
+                return;
+            }
+
+            // 1. Recuperiamo i dati del materiale selezionato
+            var oMaterialData = oContext.getObject();
+            this._sSelectedMatnr = oMaterialData.Matnr; 
+
+            var oView = this.getView();
+
+            // 2. Creiamo il Dialog di Acquisto programmaticamente se non esiste ancora
+            if (!this._oPurchaseDialog) {
+                this._oPurchaseDialog = new Dialog({
+                    title: "Riepilogo Acquisto",
+                    type: "Message",
+                    content: [
+                        new Text({ id: "purchaseDialogText", class: "sapUiSmallMarginBottom" }),
+                        //new Label({ text: "Specificare la quantità da acquistare", required: true }),
+                        new Input({ 
+                            id: "inputQuantity", 
+                            type: "Number", 
+                            placeholder: "Es. 10" 
+                        })
+                    ],
+                    beginButton: new Button({
+                        text: "Acquista",
+                        type: "Emphasized",
+                        press: this.onExecutePurchase.bind(this)
+                    }),
+                    endButton: new Button({
+                        text: "Annulla",
+                        press: function () {
+                            this._oPurchaseDialog.close();
+                        }.bind(this)
+                    })
+                });
+                oView.addDependent(this._oPurchaseDialog);
+            }
+
+            // Resetta il campo quantità e blocca lo schermo con un indicatore di caricamento sul Dialog
+            Element.getElementById("inputQuantity").setValue(""); 
+            this._oPurchaseDialog.open();
+            this._oPurchaseDialog.setBusy(true);
+
+            // 3. Chiamata GET OData v2 per recuperare la descrizione specifica del materiale
+            // NOTA: Sostituisci '/MaterialDescriptionSet' con il nome reale del tuo EntitySet delle descrizioni
+            // e 'Maktx' con il nome tecnico del campo descrizione backend.
+            var sKeyPath = oModel.createKey("/Material_TextSet", {
+                Matnr: this._sSelectedMatnr
+            });
+
+            oModel.read(sKeyPath, {
+                success: function (oData) {
+                    this._oPurchaseDialog.setBusy(false);
+                    var sDescrizione = oData.Maktx || "Nessuna descrizione disponibile";
+
+                    // Aggiorna il testo dinamico includendo Codice E Descrizione del materiale
+                    Element.getElementById("purchaseDialogText").setText(
+                        "Stai acquistando il materiale: " + this._sSelectedMatnr + " - " + sDescrizione + ".\n" +
+                        "Scegli la quantità da acquistare?"
+                    );
+                }.bind(this),
+                error: function (oError) {
+                    this._oPurchaseDialog.setBusy(false);
+                    
+                    // Se la lettura fallisce, mostriamo comunque il codice materiale per non bloccare l'utente
+                    Element.getElementById("purchaseDialogText").setText(
+                        "Vuoi procedere con la creazione dell'Ordine di Acquisto per il materiale " + this._sSelectedMatnr + "?"
+                    );
+                }.bind(this)
+            });
+        },
+
+        /**
+         * Chiama l'azione/metodo custom su ABAP per registrare l'acquisto
+         */
+        onExecutePurchase: function () {
+            var oModel = this.getView().getModel("odataSydea");
+            
+            // 1. Recupera e convalida la quantità inserita
+            var sQuantity = Element.getElementById("inputQuantity").getValue();
+            
+            if (!sQuantity || parseFloat(sQuantity) <= 0) {
+                MessageBox.error("Inserire una quantità valida maggiore di zero.");
+                return;
+            }
+
+            this._oPurchaseDialog.setBusy(true);
+
+            // 2. Inviamo i parametri (Matnr e Menge/Quantity) al backend ABAP
+            oModel.callFunction("/CreatePurchaseOrder", {
+                method: "POST",
+                urlParameters: {
+                    "Matnr": this._sSelectedMatnr,
+                    "Quantity": sQuantity // Nome del parametro tecnico che mapperai su SEGW
+                },
+                success: function (oData, oResponse) {
+                    this._oPurchaseDialog.setBusy(false);
+                    this._oPurchaseDialog.close();
+                    
+                    var sPoNumber = oData.Ebeln || "Generato"; 
+                    MessageBox.success("Ordine di acquisto " + sPoNumber + " (Qtà: " + sQuantity + ") creato con successo!");
+                }.bind(this),
+                error: function (oError) {
+                    this._oPurchaseDialog.setBusy(false);
+                    var sErrorMessage = "Errore durante la creazione dell'ordine.";
+                    if (oError.responseText) {
+                        try {
+                            var oResponseObj = JSON.parse(oError.responseText);
+                            sErrorMessage = oResponseObj.error.message.value;
+                        } catch (e) {
+                            sErrorMessage = oError.responseText;
+                        }
+                    }
+                    MessageBox.error(sErrorMessage);
+                }.bind(this)
+            });
         },
 
         /**
